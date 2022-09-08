@@ -16,6 +16,14 @@ import (
 	"github.com/markbates/goth/providers/google"
 )
 
+var SCOPES = []string{"profile", "https://www.googleapis.com/auth/youtube.readonly"}
+
+const (
+	CLIENT_ID     = "1056709788044-9k78m5n55u6mbrp6fp004hq0fi5r0ltj.apps.googleusercontent.com"
+	CLIENT_SECRET = "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"
+	CALLBACK_URL  = "http://localhost:8080/auth/google/callback"
+)
+
 func generateSessionKey() []byte {
 	key := make([]byte, 64)
 
@@ -41,7 +49,7 @@ func main() {
 	gothic.Store = store
 
 	goth.UseProviders(
-		google.New("1056709788044-9k78m5n55u6mbrp6fp004hq0fi5r0ltj.apps.googleusercontent.com", "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", "http://localhost:8080/auth/google/callback", "profile", "https://www.googleapis.com/auth/youtube.readonly"),
+		google.New(CLIENT_ID, CLIENT_SECRET, CALLBACK_URL, SCOPES...),
 	)
 
 	p := pat.New()
