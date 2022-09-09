@@ -59,15 +59,7 @@ func main() {
 		gothic.BeginAuthHandler(w, r)
 	})
 
-	p.Get("/channelData", getChannelData)
-
-	p.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
-		gothic.Logout(w, r)
-	})
-
-	p.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "hello world")
-	})
+	p.Get("/api/channelData", getChannelData)
 
 	log.Println("listening on localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", p))
@@ -127,7 +119,6 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request, token string) stri
 func getChannelData(w http.ResponseWriter, r *http.Request) {
 
 	channelId := getUserChannelId(w, r, r.Header.Get("Authorization"))
-	// fmt.Fprintf(w, "%+v\n", channelId)
 	w.Write([]byte(channelId))
 }
 
