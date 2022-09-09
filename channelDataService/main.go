@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func main() {
@@ -20,7 +21,7 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request, token string) stri
 	}
 
 	q := req.URL.Query()
-	q.Add("part", "id")
+	q.Add("part", "snippet")
 	q.Add("mine", "true")
 	q.Add("access_token", token)
 	req.URL.RawQuery = q.Encode()
@@ -48,14 +49,14 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request, token string) stri
 	err = json.Unmarshal(body, &response)
 
 	if err != nil {
-		fmt.Fprintf(w, "404 Not Found")
+		w.WriteHeader(404)
+		w.Write([]byte("404 Not Found"))
 	}
 
 	return response.Items[0].Id
 }
 
 func getChannelData(w http.ResponseWriter, r *http.Request) {
-
-	channelId := getUserChannelId(w, r, r.Header.Get("Authorization"))
+	channelId := getUserChannelId(w, r, strings.Fields(r.Header.Get("Authorization"))[1])
 	w.Write([]byte(channelId))
 }

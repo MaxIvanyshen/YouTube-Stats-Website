@@ -68,6 +68,6 @@ func authCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("Authorization", user.AccessToken)
+	w.Header().Add("Authorization", "Bearer "+user.AccessToken)
 	w.WriteHeader(200)
 }
