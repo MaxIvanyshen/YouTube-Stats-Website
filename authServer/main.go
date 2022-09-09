@@ -83,7 +83,7 @@ func getAccessTokenFromCookies(r *http.Request) string {
 	return accessToken
 }
 
-func getUserChannelId(w http.ResponseWriter, r *http.Request) string {
+func getUserChannelId(w http.ResponseWriter, r *http.Request, token string) string {
 	req, err := http.NewRequest("GET", "https://www.googleapis.com/youtube/v3/channels", nil)
 	if err != nil {
 		fmt.Fprintf(w, "%+v\n", err)
@@ -92,7 +92,7 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request) string {
 	q := req.URL.Query()
 	q.Add("part", "id")
 	q.Add("mine", "true")
-	q.Add("access_token", getAccessTokenFromCookies(r))
+	q.Add("access_token", token)
 	req.URL.RawQuery = q.Encode()
 
 	client := &http.Client{}
@@ -125,8 +125,10 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request) string {
 }
 
 func getChannelData(w http.ResponseWriter, r *http.Request) {
-	channelId := getUserChannelId(w, r)
-	fmt.Fprintf(w, "%+v\n", channelId)
+
+	channelId := getUserChannelId(w, r, r.Header.Get("Authorization"))
+	// fmt.Fprintf(w, "%+v\n", channelId)
+	w.Write([]byte(channelId))
 }
 
 func authCallback(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +138,6 @@ func authCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gothic.StoreInSession("access_token", user.AccessToken, r, w)
-	http.Redirect(w, r, "/channelData", 301)
+	w.Header().Add("Authorization", user.AccessToken)
+	w.WriteHeader(200)
 }
