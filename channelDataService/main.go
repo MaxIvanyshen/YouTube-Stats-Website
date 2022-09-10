@@ -21,7 +21,7 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request, token string) stri
 	}
 
 	q := req.URL.Query()
-	q.Add("part", "snippet")
+	q.Add("part", "id")
 	q.Add("mine", "true")
 	q.Add("access_token", token)
 	req.URL.RawQuery = q.Encode()

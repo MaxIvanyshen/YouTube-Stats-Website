@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"crypto/rand"
 	"log"
@@ -55,6 +56,27 @@ func main() {
 
 	p.Get("/auth/{provider}", func(w http.ResponseWriter, r *http.Request) {
 		gothic.BeginAuthHandler(w, r)
+	})
+
+	p.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
+		req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/revoke?token="+strings.Fields(r.Header.Get("Authorization"))[1], nil)
+		if err != nil {
+			fmt.Fprintf(w, "%+v\n", err)
+		}
+
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		q := req.URL.Query()
+		req.URL.RawQuery = q.Encode()
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Fprintf(w, "%+v\n", err)
+		}
+
+		defer resp.Body.Close()
+
+		fmt.Println("Response Status: " + resp.Status)
+		gothic.Logout(w, r)
 	})
 
 	log.Println("listening on localhost:8080")
