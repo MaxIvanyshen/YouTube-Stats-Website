@@ -59,13 +59,14 @@ func main() {
 	})
 
 	p.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
-		req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/revoke?token="+strings.Fields(r.Header.Get("Authorization"))[1], nil)
+		req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/revoke", nil)
 		if err != nil {
 			fmt.Fprintf(w, "%+v\n", err)
 		}
 
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		q := req.URL.Query()
+		q.Add("token", strings.Fields(r.Header.Get("Authorization"))[1])
 		req.URL.RawQuery = q.Encode()
 		client := &http.Client{}
 		resp, err := client.Do(req)
