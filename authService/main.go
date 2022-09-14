@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +14,10 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/google"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 var SCOPES = []string{"profile", "https://www.googleapis.com/auth/youtube.readonly"}
@@ -47,9 +52,14 @@ func main() {
 
 	gothic.Store = store
 
+	goog := google.New(CLIENT_ID, CLIENT_SECRET, CALLBACK_URL, SCOPES...)
+	goog.SetAccessType("offline")
+
 	goth.UseProviders(
-		google.New(CLIENT_ID, CLIENT_SECRET, CALLBACK_URL, SCOPES...),
+		goog,
 	)
+
+	// google.SetAccessType("offline")
 
 	p := pat.New()
 	p.Get("/auth/{provider}/callback", authCallback)
@@ -91,6 +101,33 @@ func authCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	insertToDB(user.AccessToken, "user.RefreshToken")
+
 	w.Header().Add("Authorization", "Bearer "+user.AccessToken)
 	w.WriteHeader(200)
+}
+func insertToDB(access_token, refresh_token string) bool {
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		return false
+	}
+
+	if err := client.Ping(context.TODO(), readpref.Primary()); err != nil {
+		return false
+	}
+
+	usersCollection := client.Database("youtube-stats-app").Collection("users")
+
+	// insert a single document into a collection
+	// create a bson.D object
+	user := bson.D{{"access_token", access_token}, {"refresh_token", refresh_token}}
+	// insert the bson object using InsertOne()
+	result, err := usersCollection.InsertOne(context.TODO(), user)
+	// check for errors in the insertion
+	if err != nil {
+		return false
+	}
+	// display the id of the newly inserted object
+	fmt.Println(result.InsertedID)
+	return true
 }
