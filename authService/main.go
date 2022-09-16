@@ -71,6 +71,7 @@ func main() {
 	})
 
 	p.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
+		access_token := strings.Fields(r.Header.Get("Authorization"))[1]
 		req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/revoke", nil)
 		if err != nil {
 			fmt.Fprintf(w, "%+v\n", err)
@@ -78,7 +79,7 @@ func main() {
 
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		q := req.URL.Query()
-		q.Add("token", strings.Fields(r.Header.Get("Authorization"))[1])
+		q.Add("token", access_token)
 		req.URL.RawQuery = q.Encode()
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -87,6 +88,11 @@ func main() {
 		}
 
 		defer resp.Body.Close()
+
+		err = removeUsersFile(access_token)
+		if err != nil {
+			fmt.Fprint(w, "Can't delete user data")
+		}
 
 		fmt.Println("Response Status: " + resp.Status)
 		gothic.Logout(w, r)
@@ -108,7 +114,11 @@ func authCallback(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  user.AccessToken,
 		RefreshToken: user.RefreshToken,
 	}
-	save(currentUser)
+	err = save(currentUser)
+	if err != nil {
+		fmt.Fprintf(w, "%+v", err)
+		return
+	}
 
 	w.Header().Add("Authorization", "Bearer "+user.AccessToken)
 	w.WriteHeader(200)
@@ -121,12 +131,11 @@ func generateId() string {
 	return fmt.Sprintf("%x", b)[:USER_ID_LENGTH]
 }
 
-func save(user AppUser) bool {
-	//TODO: look if user already exists
-	f, err := os.Create("./user_files/" + user.Id + ".txt")
+func save(user AppUser) error {
+	f, err := os.Create("./user_files/" + user.AccessToken + ".txt")
 	if err != nil {
 		fmt.Printf("Error while creating: %v\n", err)
-		return false
+		return err
 	}
 	defer f.Close()
 
@@ -134,10 +143,18 @@ func save(user AppUser) bool {
 
 	if err != nil {
 		fmt.Printf("Error while writing: %v\n", err)
-		return false
+		return err
 	}
 
-	return true
+	return nil
+}
+
+func removeUsersFile(access_token string) error {
+	err := os.Remove("./user_files/" + access_token + ".txt")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // func insertToDB(access_token, refresh_token string) bool {
