@@ -59,6 +59,8 @@ func main() {
 		gothic.BeginAuthHandler(w, r)
 	})
 
+	p.Get("/api/sessions", checkIfSessionExists)
+
 	p.Get("/logout", logout)
 
 	log.Println("listening on localhost:8080")
@@ -157,6 +159,16 @@ func removeUsersFile(access_token string) error {
 		return err
 	}
 	return nil
+}
+
+func checkIfSessionExists(w http.ResponseWriter, r *http.Request) {
+	access_token := strings.Fields(r.Header.Get("Authorization"))[1]
+	if _, err := os.Stat("./user_files/" + access_token + ".txt"); err == nil {
+		w.WriteHeader(200)
+		return
+	}
+	w.WriteHeader(404)
+	return
 }
 
 // func insertToDB(access_token, refresh_token string) bool {
