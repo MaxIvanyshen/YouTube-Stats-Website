@@ -17,6 +17,12 @@ import (
 	"github.com/markbates/goth/providers/google"
 )
 
+type AppUser struct {
+	Id           string
+	AccessToken  string
+	RefreshToken string
+}
+
 var SCOPES = []string{"profile", "https://www.googleapis.com/auth/youtube.readonly"}
 
 const (
@@ -25,23 +31,6 @@ const (
 	CLIENT_SECRET  = "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"
 	CALLBACK_URL   = "http://localhost:8080/auth/google/callback"
 )
-
-func generateSessionKey() []byte {
-	key := make([]byte, 64)
-
-	_, err := rand.Read(key)
-	if err != nil {
-		panic(err)
-	}
-
-	return key
-}
-
-type AppUser struct {
-	Id           string
-	AccessToken  string
-	RefreshToken string
-}
 
 func main() {
 
@@ -70,36 +59,38 @@ func main() {
 		gothic.BeginAuthHandler(w, r)
 	})
 
-	p.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
-		access_token := strings.Fields(r.Header.Get("Authorization"))[1]
-		req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/revoke", nil)
-		if err != nil {
-			fmt.Fprintf(w, "%+v\n", err)
-		}
-
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		q := req.URL.Query()
-		q.Add("token", access_token)
-		req.URL.RawQuery = q.Encode()
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Fprintf(w, "%+v\n", err)
-		}
-
-		defer resp.Body.Close()
-
-		err = removeUsersFile(access_token)
-		if err != nil {
-			fmt.Fprint(w, "Can't delete user data")
-		}
-
-		fmt.Println("Response Status: " + resp.Status)
-		gothic.Logout(w, r)
-	})
+	p.Get("/logout", logout)
 
 	log.Println("listening on localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", p))
+}
+
+func logout(w http.ResponseWriter, r *http.Request) {
+	access_token := strings.Fields(r.Header.Get("Authorization"))[1]
+	req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/revoke", nil)
+	if err != nil {
+		fmt.Fprintf(w, "%+v\n", err)
+	}
+
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	q := req.URL.Query()
+	q.Add("token", access_token)
+	req.URL.RawQuery = q.Encode()
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Fprintf(w, "%+v\n", err)
+	}
+
+	defer resp.Body.Close()
+
+	err = removeUsersFile(access_token)
+	if err != nil {
+		fmt.Fprint(w, "Can't delete user data")
+	}
+
+	fmt.Println("Response Status: " + resp.Status)
+	gothic.Logout(w, r)
 }
 
 func authCallback(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +113,17 @@ func authCallback(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Authorization", "Bearer "+user.AccessToken)
 	w.WriteHeader(200)
+}
+
+func generateSessionKey() []byte {
+	key := make([]byte, 64)
+
+	_, err := rand.Read(key)
+	if err != nil {
+		panic(err)
+	}
+
+	return key
 }
 
 func generateId() string {
