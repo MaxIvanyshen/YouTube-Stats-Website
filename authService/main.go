@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	"crypto/rand"
 	"log"
+	"math/rand"
+	"os"
+	"time"
 
 	"github.com/gorilla/pat"
 	"github.com/gorilla/sessions"
@@ -18,9 +20,10 @@ import (
 var SCOPES = []string{"profile", "https://www.googleapis.com/auth/youtube.readonly"}
 
 const (
-	CLIENT_ID     = "1056709788044-9k78m5n55u6mbrp6fp004hq0fi5r0ltj.apps.googleusercontent.com"
-	CLIENT_SECRET = "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"
-	CALLBACK_URL  = "http://localhost:8080/auth/google/callback"
+	USER_ID_LENGTH = 15
+	CLIENT_ID      = "1056709788044-9k78m5n55u6mbrp6fp004hq0fi5r0ltj.apps.googleusercontent.com"
+	CLIENT_SECRET  = "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"
+	CALLBACK_URL   = "http://localhost:8080/auth/google/callback"
 )
 
 func generateSessionKey() []byte {
@@ -32,6 +35,12 @@ func generateSessionKey() []byte {
 	}
 
 	return key
+}
+
+type AppUser struct {
+	Id           string
+	AccessToken  string
+	RefreshToken string
 }
 
 func main() {
@@ -53,8 +62,6 @@ func main() {
 	goth.UseProviders(
 		goog,
 	)
-
-	// google.SetAccessType("offline")
 
 	p := pat.New()
 	p.Get("/auth/{provider}/callback", authCallback)
@@ -96,12 +103,41 @@ func authCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// insertToDB(user.AccessToken, user.RefreshToken)
-
-	fmt.Println(user.AccessToken + " | " + user.RefreshToken)
+	currentUser := AppUser{
+		Id:           generateId(),
+		AccessToken:  user.AccessToken,
+		RefreshToken: user.RefreshToken,
+	}
+	save(currentUser)
 
 	w.Header().Add("Authorization", "Bearer "+user.AccessToken)
 	w.WriteHeader(200)
+}
+
+func generateId() string {
+	rand.Seed(time.Now().UnixNano())
+	b := make([]byte, USER_ID_LENGTH)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)[:USER_ID_LENGTH]
+}
+
+func save(user AppUser) bool {
+	//TODO: look if user already exists
+	f, err := os.Create("./user_files/" + user.Id + ".txt")
+	if err != nil {
+		fmt.Printf("Error while creating: %v\n", err)
+		return false
+	}
+	defer f.Close()
+
+	_, err = f.WriteString("id: " + user.Id + "\naccess_token: " + user.AccessToken + "\nrefresh_token: " + user.RefreshToken)
+
+	if err != nil {
+		fmt.Printf("Error while writing: %v\n", err)
+		return false
+	}
+
+	return true
 }
 
 // func insertToDB(access_token, refresh_token string) bool {
