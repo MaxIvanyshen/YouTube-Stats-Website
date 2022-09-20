@@ -36,6 +36,17 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request, token string) stri
 
 	fmt.Println("Response Status: " + resp.Status)
 
+	if strings.Fields(resp.Status)[0] == "401" {
+		if sessionExists(token) {
+			w.WriteHeader(500)
+			return ""
+		} else {
+			w.WriteHeader(401)
+			return ""
+			// return getUserChannelId(w, r, getRefreshedToken(token))
+		}
+	}
+
 	var response struct {
 		Kind  string `json:"kind"`
 		Items []struct {
@@ -54,6 +65,47 @@ func getUserChannelId(w http.ResponseWriter, r *http.Request, token string) stri
 	}
 
 	return response.Items[0].Id
+}
+
+func getRefreshedToken(expiredToken string) string {
+	req, err := http.NewRequest("GET", "http://localhost:8081/api/refresh", nil)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+
+	req.Header.Add("Authorization", expiredToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+
+	defer resp.Body.Close()
+	return expiredToken
+}
+
+func sessionExists(token string) bool {
+	req, err := http.NewRequest("GET", "http://localhost:8081/api/sessions", nil)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+
+	req.Header.Add("Authorization", token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+
+	defer resp.Body.Close()
+
+	if strings.Fields(resp.Status)[0] == "404" {
+		return false
+	} else {
+		return true
+	}
 }
 
 func getChannelData(w http.ResponseWriter, r *http.Request) {

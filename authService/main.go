@@ -1,13 +1,15 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
-	"net/http"
-	"strings"
-
+	"io/ioutil"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/pat"
@@ -21,6 +23,14 @@ type AppUser struct {
 	Id           string
 	AccessToken  string
 	RefreshToken string
+}
+
+type Token struct {
+	accessToken string   `json: "access_token"`
+	expiresIn   int      `json: "expires_in"`
+	scope       []string `json: "scope"`
+	tokenType   string   `json: "token_type"`
+	id_token    string   `json: "id_token"`
 }
 
 var SCOPES = []string{"profile", "https://www.googleapis.com/auth/youtube.readonly"}
@@ -61,10 +71,96 @@ func main() {
 
 	p.Get("/api/sessions", checkIfSessionExists)
 
+	p.Get("/api/refresh", refreshedToken)
+
 	p.Get("/logout", logout)
 
 	log.Println("listening on localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", p))
+}
+
+func refreshedToken(w http.ResponseWriter, r *http.Request) {
+	access_token := strings.Fields(r.Header.Get("Authorization"))[1]
+	var dataJson = []byte(`{
+		"client_id": "` + CLIENT_ID + `",
+		"client_secret": "` + CLIENT_SECRET + `",
+		"refresh_token": "` + getRefreshToken(access_token) + `",
+		"grant_type": "refresh_token"
+	}`)
+	req, err := http.NewRequest("POST", "https://www.googleapis.com/oauth2/v4/token", bytes.NewBuffer(dataJson))
+	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	newToken := strings.Fields(string(body))[2]
+	newToken = newToken[:len(newToken)-2]
+	newToken = newToken[1:]
+
+	if newToken != "invalid_request" {
+		changeStoredUserData(access_token, newToken)
+		w.Header().Add("Authorization", "Bearer "+newToken)
+		w.WriteHeader(200)
+		return
+	}
+	w.WriteHeader(401)
+}
+
+func changeStoredUserData(oldToken, newToken string) {
+	oldFile, err := os.Open("./user_files/" + oldToken + ".txt")
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+	defer oldFile.Close()
+
+	scanner := bufio.NewScanner(oldFile)
+	i := 0
+	var neededLines []string
+	for scanner.Scan() {
+		if i != 1 {
+			neededLines = append(neededLines, scanner.Text())
+		}
+		i++
+	}
+
+	newFile, err := os.Create("./user_files/" + newToken + ".txt")
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+	defer newFile.Close()
+
+	_, err = newFile.WriteString(neededLines[0] + "\naccess_token: " + newToken + "\nrefresh_token" + neededLines[1])
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+	removeUsersFile(oldToken)
+}
+
+func getRefreshToken(access_token string) string {
+	file, err := os.Open("./user_files/" + access_token + ".txt")
+	if err != nil {
+		fmt.Printf("%+v\n", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	i := 0
+	for scanner.Scan() {
+		if i == 2 {
+			return strings.Fields(scanner.Text())[1]
+		}
+		i++
+	}
+	return ""
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
